@@ -1,0 +1,63 @@
+{
+    "name": "vinitkadam03/laravel-ai-telemetry",
+    "description": "OpenTelemetry instrumentation for the Laravel AI SDK. Listens to laravel/ai events and emits gen_ai.* spans.",
+    "license": "MIT",
+    "keywords": [
+        "laravel",
+        "ai",
+        "opentelemetry",
+        "telemetry",
+        "observability"
+    ],
+    "homepage": "https://github.com/vinitkadam03/laravel-ai-telemetry",
+    "support": {
+        "issues": "https://github.com/vinitkadam03/laravel-ai-telemetry/issues",
+        "source": "https://github.com/vinitkadam03/laravel-ai-telemetry"
+    },
+    "require": {
+        "php": "^8.3",
+        "illuminate/contracts": "^12.0|^13.0",
+        "illuminate/support": "^12.0|^13.0",
+        "laravel/ai": "^1.0",
+        "open-telemetry/api": "^1.0"
+    },
+    "require-dev": {
+        "open-telemetry/exporter-otlp": "^1.4",
+        "open-telemetry/sdk": "^1.14",
+        "orchestra/testbench": "^10.6|^11.0",
+        "pestphp/pest": "^3.0|^4.0",
+        "pestphp/pest-plugin-laravel": "^3.0|^4.0"
+    },
+    "suggest": {
+        "open-telemetry/sdk": "Required to use the otlp driver.",
+        "open-telemetry/exporter-otlp": "Required to use the otlp driver."
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "autoload": {
+        "psr-4": {
+            "Vinit\\LaravelAiTelemetry\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "pest"
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Vinit\\LaravelAiTelemetry\\AiTelemetryServiceProvider"
+            ]
+        }
+    }
+}
