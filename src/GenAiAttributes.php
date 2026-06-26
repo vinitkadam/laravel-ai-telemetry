@@ -103,10 +103,14 @@ class GenAiAttributes
 
     private static function stepStart(StepStarted $event): array
     {
-        return [
+        return array_filter([
             'gen_ai.operation.name' => 'chat',
+            'gen_ai.request.model' => $event->model,
             'gen_ai.request.step_number' => $event->stepNumber,
-        ];
+            'gen_ai.request.max_tokens' => $event->options?->maxTokens,
+            'gen_ai.request.temperature' => $event->options?->temperature,
+            'gen_ai.request.top_p' => $event->options?->topP,
+        ], fn ($v) => $v !== null);
     }
 
     private static function stepEnd(StepCompleted $event): array
