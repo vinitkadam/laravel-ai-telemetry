@@ -6,7 +6,7 @@ use Laravel\Ai\Contracts\Providers\TextProvider;
 use Laravel\Ai\Events\AgentFailed;
 use Laravel\Ai\Events\InvokingTool;
 use Laravel\Ai\Events\PromptingAgent;
-use Laravel\Ai\Events\StepCompleted;
+use Laravel\Ai\Events\StepFinished;
 use Laravel\Ai\Events\StepFailed;
 use Laravel\Ai\Events\StepStarted;
 use Laravel\Ai\Events\ToolInvoked;
@@ -139,9 +139,9 @@ describe('GenAiAttributes::fromStart', function () {
 });
 
 describe('GenAiAttributes::fromEnd', function () {
-    test('StepCompleted returns response model, provider, finish_reasons, and usage tokens', function () {
+    test('StepFinished returns response model, provider, finish_reasons, and usage tokens', function () {
         $response = fakeStepResponse('gpt-4o', 'openai', 100, 50, FinishReason::Stop);
-        $event = new StepCompleted(
+        $event = new StepFinished(
             invocationId: 'inv-1',
             stepId: 'step-1',
             stepNumber: 1,
@@ -157,9 +157,9 @@ describe('GenAiAttributes::fromEnd', function () {
         expect($attrs['gen_ai.usage.output_tokens'])->toBe(50);
     });
 
-    test('StepCompleted includes cache_read_input_tokens when greater than zero', function () {
+    test('StepFinished includes cache_read_input_tokens when greater than zero', function () {
         $response = fakeStepResponse(cacheRead: 25, cacheWrite: 0);
-        $event = new StepCompleted('inv-1', 'step-1', 1, $response);
+        $event = new StepFinished('inv-1', 'step-1', 1, $response);
 
         $attrs = GenAiAttributes::fromEnd($event);
 
@@ -167,9 +167,9 @@ describe('GenAiAttributes::fromEnd', function () {
         expect($attrs)->not->toHaveKey('gen_ai.usage.cache_creation_input_tokens');
     });
 
-    test('StepCompleted includes cache_creation_input_tokens when greater than zero', function () {
+    test('StepFinished includes cache_creation_input_tokens when greater than zero', function () {
         $response = fakeStepResponse(cacheRead: 0, cacheWrite: 10);
-        $event = new StepCompleted('inv-1', 'step-1', 1, $response);
+        $event = new StepFinished('inv-1', 'step-1', 1, $response);
 
         $attrs = GenAiAttributes::fromEnd($event);
 

@@ -16,7 +16,7 @@ use Laravel\Ai\Events\InvokingTool;
 use Laravel\Ai\Events\PromptingAgent;
 use Laravel\Ai\Events\Reranked;
 use Laravel\Ai\Events\Reranking;
-use Laravel\Ai\Events\StepCompleted;
+use Laravel\Ai\Events\StepFinished;
 use Laravel\Ai\Events\StepFailed;
 use Laravel\Ai\Events\StepStarted;
 use Laravel\Ai\Events\StreamingAgent;
@@ -57,7 +57,7 @@ class GenAiAttributes
         return match (true) {
             $event instanceof AgentPrompted,
             $event instanceof AgentStreamed => self::agentEnd($event),
-            $event instanceof StepCompleted => self::stepEnd($event),
+            $event instanceof StepFinished => self::stepEnd($event),
             $event instanceof ToolInvoked => self::toolEnd($event),
             $event instanceof EmbeddingsGenerated => self::embeddingEnd($event),
             $event instanceof ImageGenerated => self::imageEnd($event),
@@ -117,7 +117,7 @@ class GenAiAttributes
         ], fn ($v) => $v !== null);
     }
 
-    private static function stepEnd(StepCompleted $event): array
+    private static function stepEnd(StepFinished $event): array
     {
         $step = $event->response;
 

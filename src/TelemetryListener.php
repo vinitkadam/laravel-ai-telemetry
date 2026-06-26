@@ -18,7 +18,7 @@ use Laravel\Ai\Events\InvokingTool;
 use Laravel\Ai\Events\PromptingAgent;
 use Laravel\Ai\Events\Reranked;
 use Laravel\Ai\Events\Reranking;
-use Laravel\Ai\Events\StepCompleted;
+use Laravel\Ai\Events\StepFinished;
 use Laravel\Ai\Events\StepFailed;
 use Laravel\Ai\Events\StepStarted;
 use Laravel\Ai\Events\StreamingAgent;
@@ -76,7 +76,7 @@ class TelemetryListener
         $this->collector->setActiveStepSpanKey($event->stepId);
     }
 
-    public function handleStepCompleted(StepCompleted $event): void
+    public function handleStepFinished(StepFinished $event): void
     {
         $this->collector->endSpan($event->stepId, $event);
         $this->collector->clearActiveStepSpanKey();
@@ -232,7 +232,7 @@ class TelemetryListener
             AgentStreamed::class => 'handleAgentStreamed',
             AgentFailed::class => 'handleAgentFailed',
             StepStarted::class => 'handleStepStarted',
-            StepCompleted::class => 'handleStepCompleted',
+            StepFinished::class => 'handleStepFinished',
             StepFailed::class => 'handleStepFailed',
             InvokingTool::class => 'handleInvokingTool',
             ToolInvoked::class => 'handleToolInvoked',
