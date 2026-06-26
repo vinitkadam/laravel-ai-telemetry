@@ -16,7 +16,7 @@ return [
     |   otel  — emits spans into the application's existing TracerProvider,
     |            registered via \OpenTelemetry\API\Globals::registerInitializer.
     |            Requires only open-telemetry/api (already a dependency of this
-    |            package). Pair with vinitkadam03/laravel-ai-phoenix to route
+    |            package). Pair with vinitkadam/laravel-ai-phoenix to route
     |            spans to Arize Phoenix, or wire any other TracerProvider.
     |
     */
