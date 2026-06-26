@@ -16,18 +16,15 @@
     },
     "repositories": [
         {
-            "type": "path",
-            "url": "../laravel-ai",
-            "options": {
-                "symlink": true
-            }
+            "type": "vcs",
+            "url": "https://github.com/vinitkadam03/ai.git"
         }
     ],
     "require": {
         "php": "^8.3",
         "illuminate/contracts": "^12.0|^13.0",
         "illuminate/support": "^12.0|^13.0",
-        "laravel/ai": "*",
+        "laravel/ai": "dev-feat/telemetry as 0.8.1",
         "open-telemetry/api": "^1.0"
     },
     "require-dev": {

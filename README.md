@@ -66,18 +66,25 @@ Every AI operation produces a span hierarchy. Span names follow the format `{ope
 
 One per `prompt()` or `stream()` call. Parent of all step and tool spans for that invocation.
 
-| Attribute | Set at | Value |
-|---|---|---|
-| `gen_ai.operation.name` | open | `"chat"` |
-| `gen_ai.request.model` | open | Requested model name |
-| `gen_ai.provider.name` | open | Provider name (e.g. `"openai"`, `"anthropic"`) |
-| `gen_ai.system` | open | Provider name (transitional alias for `gen_ai.provider.name`) |
-| `gen_ai.response.model` | close | Actual model used by the provider |
-| `gen_ai.usage.input_tokens` | close | Total prompt tokens across all steps |
-| `gen_ai.usage.output_tokens` | close | Total completion tokens across all steps |
-| `gen_ai.usage.reasoning_tokens` | close | Reasoning tokens, when > 0 (o-series / extended thinking models) |
-| `gen_ai.usage.cache_read_input_tokens` | close | Tokens served from the provider cache, when > 0 |
-| `gen_ai.usage.cache_creation_input_tokens` | close | Tokens written to the provider cache, when > 0 |
+**On request:**
+
+| Attribute | Value |
+|---|---|
+| `gen_ai.operation.name` | `"chat"` |
+| `gen_ai.request.model` | Requested model name |
+| `gen_ai.provider.name` | Provider name (e.g. `"openai"`, `"anthropic"`) |
+| `gen_ai.system` | Provider name _(transitional alias for `gen_ai.provider.name`)_ |
+
+**On response:**
+
+| Attribute | Value |
+|---|---|
+| `gen_ai.response.model` | Actual model used by the provider |
+| `gen_ai.usage.input_tokens` | Total prompt tokens across all steps |
+| `gen_ai.usage.output_tokens` | Total completion tokens across all steps |
+| `gen_ai.usage.reasoning_tokens` | Reasoning tokens _(o-series / extended thinking models, omitted when zero)_ |
+| `gen_ai.usage.cache_read_input_tokens` | Tokens served from the provider cache _(omitted when zero)_ |
+| `gen_ai.usage.cache_creation_input_tokens` | Tokens written to the provider cache _(omitted when zero)_ |
 
 ---
 
@@ -85,23 +92,30 @@ One per `prompt()` or `stream()` call. Parent of all step and tool spans for tha
 
 One per LLM API call within the invocation loop. A single-turn invocation has one step; tool-use loops produce one step per round-trip. Child of the invocation span.
 
-| Attribute | Set at | Value |
-|---|---|---|
-| `gen_ai.operation.name` | open | `"chat"` |
-| `gen_ai.request.model` | open | Requested model name |
-| `gen_ai.request.step_number` | open | Step index within the invocation (0-based) |
-| `gen_ai.request.max_tokens` | open | `maxTokens` option, when set |
-| `gen_ai.request.temperature` | open | `temperature` option, when set |
-| `gen_ai.request.top_p` | open | `topP` option, when set |
-| `gen_ai.provider.name` | close | Provider name |
-| `gen_ai.system` | close | Provider name (transitional alias for `gen_ai.provider.name`) |
-| `gen_ai.response.model` | close | Actual model used by the provider |
-| `gen_ai.response.finish_reasons` | close | e.g. `["stop"]`, `["tool_calls"]`, `["length"]` |
-| `gen_ai.usage.input_tokens` | close | Prompt tokens for this step |
-| `gen_ai.usage.output_tokens` | close | Completion tokens for this step |
-| `gen_ai.usage.reasoning_tokens` | close | Reasoning tokens, when > 0 |
-| `gen_ai.usage.cache_read_input_tokens` | close | Tokens served from cache, when > 0 |
-| `gen_ai.usage.cache_creation_input_tokens` | close | Tokens written to cache, when > 0 |
+**On request:**
+
+| Attribute | Value |
+|---|---|
+| `gen_ai.operation.name` | `"chat"` |
+| `gen_ai.request.model` | Requested model name |
+| `gen_ai.request.step_number` | Step index within the invocation (0-based) |
+| `gen_ai.request.max_tokens` | `maxTokens` option _(omitted when not set)_ |
+| `gen_ai.request.temperature` | `temperature` option _(omitted when not set)_ |
+| `gen_ai.request.top_p` | `topP` option _(omitted when not set)_ |
+
+**On response:**
+
+| Attribute | Value |
+|---|---|
+| `gen_ai.provider.name` | Provider name |
+| `gen_ai.system` | Provider name _(transitional alias for `gen_ai.provider.name`)_ |
+| `gen_ai.response.model` | Actual model used by the provider |
+| `gen_ai.response.finish_reasons` | e.g. `["stop"]`, `["tool_calls"]`, `["length"]` |
+| `gen_ai.usage.input_tokens` | Prompt tokens for this step |
+| `gen_ai.usage.output_tokens` | Completion tokens for this step |
+| `gen_ai.usage.reasoning_tokens` | Reasoning tokens _(omitted when zero)_ |
+| `gen_ai.usage.cache_read_input_tokens` | Tokens served from cache _(omitted when zero)_ |
+| `gen_ai.usage.cache_creation_input_tokens` | Tokens written to cache _(omitted when zero)_ |
 
 ---
 
@@ -109,14 +123,21 @@ One per LLM API call within the invocation loop. A single-turn invocation has on
 
 One per tool invocation. Child of the step span that triggered the tool call.
 
-| Attribute | Set at | Value |
-|---|---|---|
-| `gen_ai.operation.name` | open | `"execute_tool"` |
-| `gen_ai.tool.name` | open | Tool name |
-| `gen_ai.tool.description` | open | Tool description string |
-| `gen_ai.tool.call.id` | open | Tool call ID assigned by the model |
-| `gen_ai.tool.call.arguments` | open | JSON-encoded arguments passed to the tool |
-| `gen_ai.tool.call.result` | close | Tool result (string, or JSON-encoded if non-string) |
+**On request:**
+
+| Attribute | Value |
+|---|---|
+| `gen_ai.operation.name` | `"execute_tool"` |
+| `gen_ai.tool.name` | Tool name |
+| `gen_ai.tool.description` | Tool description |
+| `gen_ai.tool.call.id` | Tool call ID assigned by the model |
+| `gen_ai.tool.call.arguments` | JSON-encoded arguments passed to the tool |
+
+**On response:**
+
+| Attribute | Value |
+|---|---|
+| `gen_ai.tool.call.result` | Tool result (string, or JSON-encoded if non-string) |
 
 ---
 
@@ -124,14 +145,21 @@ One per tool invocation. Child of the step span that triggered the tool call.
 
 One per `generateEmbeddings()` call.
 
-| Attribute | Set at | Value |
-|---|---|---|
-| `gen_ai.operation.name` | open | `"embeddings"` |
-| `gen_ai.request.model` | open | Requested model name |
-| `gen_ai.provider.name` | open | Provider name |
-| `gen_ai.system` | open | Provider name (transitional alias) |
-| `gen_ai.response.model` | close | Actual model used |
-| `gen_ai.usage.input_tokens` | close | Tokens consumed |
+**On request:**
+
+| Attribute | Value |
+|---|---|
+| `gen_ai.operation.name` | `"embeddings"` |
+| `gen_ai.request.model` | Requested model name |
+| `gen_ai.provider.name` | Provider name |
+| `gen_ai.system` | Provider name _(transitional alias)_ |
+
+**On response:**
+
+| Attribute | Value |
+|---|---|
+| `gen_ai.response.model` | Actual model used |
+| `gen_ai.usage.input_tokens` | Tokens consumed |
 
 ---
 
@@ -139,13 +167,20 @@ One per `generateEmbeddings()` call.
 
 One per `generateImage()` call.
 
-| Attribute | Set at | Value |
-|---|---|---|
-| `gen_ai.operation.name` | open | `"image_generation"` |
-| `gen_ai.request.model` | open | Requested model name |
-| `gen_ai.provider.name` | open | Provider name |
-| `gen_ai.system` | open | Provider name (transitional alias) |
-| `gen_ai.response.model` | close | Actual model used |
+**On request:**
+
+| Attribute | Value |
+|---|---|
+| `gen_ai.operation.name` | `"image_generation"` |
+| `gen_ai.request.model` | Requested model name |
+| `gen_ai.provider.name` | Provider name |
+| `gen_ai.system` | Provider name _(transitional alias)_ |
+
+**On response:**
+
+| Attribute | Value |
+|---|---|
+| `gen_ai.response.model` | Actual model used |
 
 ---
 
@@ -153,13 +188,20 @@ One per `generateImage()` call.
 
 One per `generateSpeech()` call.
 
-| Attribute | Set at | Value |
-|---|---|---|
-| `gen_ai.operation.name` | open | `"text_to_speech"` |
-| `gen_ai.request.model` | open | Requested model name |
-| `gen_ai.provider.name` | open | Provider name |
-| `gen_ai.system` | open | Provider name (transitional alias) |
-| `gen_ai.response.model` | close | Actual model used |
+**On request:**
+
+| Attribute | Value |
+|---|---|
+| `gen_ai.operation.name` | `"text_to_speech"` |
+| `gen_ai.request.model` | Requested model name |
+| `gen_ai.provider.name` | Provider name |
+| `gen_ai.system` | Provider name _(transitional alias)_ |
+
+**On response:**
+
+| Attribute | Value |
+|---|---|
+| `gen_ai.response.model` | Actual model used |
 
 ---
 
@@ -167,13 +209,20 @@ One per `generateSpeech()` call.
 
 One per `transcribeAudio()` call.
 
-| Attribute | Set at | Value |
-|---|---|---|
-| `gen_ai.operation.name` | open | `"transcription"` |
-| `gen_ai.request.model` | open | Requested model name |
-| `gen_ai.provider.name` | open | Provider name |
-| `gen_ai.system` | open | Provider name (transitional alias) |
-| `gen_ai.response.model` | close | Actual model used |
+**On request:**
+
+| Attribute | Value |
+|---|---|
+| `gen_ai.operation.name` | `"transcription"` |
+| `gen_ai.request.model` | Requested model name |
+| `gen_ai.provider.name` | Provider name |
+| `gen_ai.system` | Provider name _(transitional alias)_ |
+
+**On response:**
+
+| Attribute | Value |
+|---|---|
+| `gen_ai.response.model` | Actual model used |
 
 ---
 
@@ -181,13 +230,20 @@ One per `transcribeAudio()` call.
 
 One per `rerank()` call.
 
-| Attribute | Set at | Value |
-|---|---|---|
-| `gen_ai.operation.name` | open | `"reranking"` |
-| `gen_ai.request.model` | open | Requested model name |
-| `gen_ai.provider.name` | open | Provider name |
-| `gen_ai.system` | open | Provider name (transitional alias) |
-| `gen_ai.response.model` | close | Actual model used |
+**On request:**
+
+| Attribute | Value |
+|---|---|
+| `gen_ai.operation.name` | `"reranking"` |
+| `gen_ai.request.model` | Requested model name |
+| `gen_ai.provider.name` | Provider name |
+| `gen_ai.system` | Provider name _(transitional alias)_ |
+
+**On response:**
+
+| Attribute | Value |
+|---|---|
+| `gen_ai.response.model` | Actual model used |
 
 ---
 
@@ -225,7 +281,7 @@ The following standard `gen_ai.*` attributes are not emitted because the data is
 | `gen_ai.response.id` | Not exposed in `Meta` |
 | `gen_ai.agent.name` | No `name()` method on the `Agent` contract |
 | `gen_ai.conversation.id` | Not available at event dispatch time |
-| `gen_ai.provider.name` on step open | Provider not included in `StepStarted` event |
+| `gen_ai.provider.name` on step request | Provider not included in `StepStarted` event |
 
 ## License
 
