@@ -22,7 +22,7 @@ Every AI invocation produces a span hierarchy:
 
 - PHP 8.3+
 - Laravel 12+
-- [laravel/ai](https://github.com/laravel/ai) ^1.0
+- [laravel/ai](https://github.com/laravel/ai) ^0.8.1
 
 ## Installation
 
