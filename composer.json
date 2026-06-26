@@ -1,5 +1,5 @@
 {
-    "name": "vinitkadam03/laravel-ai-telemetry",
+    "name": "vinitkadam/laravel-ai-telemetry",
     "description": "OpenTelemetry instrumentation for the Laravel AI SDK. Listens to laravel/ai events and emits gen_ai.* spans.",
     "license": "MIT",
     "keywords": [
@@ -9,10 +9,10 @@
         "telemetry",
         "observability"
     ],
-    "homepage": "https://github.com/vinitkadam03/laravel-ai-telemetry",
+    "homepage": "https://github.com/vinitkadam/laravel-ai-telemetry",
     "support": {
-        "issues": "https://github.com/vinitkadam03/laravel-ai-telemetry/issues",
-        "source": "https://github.com/vinitkadam03/laravel-ai-telemetry"
+        "issues": "https://github.com/vinitkadam/laravel-ai-telemetry/issues",
+        "source": "https://github.com/vinitkadam/laravel-ai-telemetry"
     },
     "require": {
         "php": "^8.3",
