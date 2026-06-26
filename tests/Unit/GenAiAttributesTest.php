@@ -113,6 +113,7 @@ describe('GenAiAttributes::fromStart', function () {
         $agent = Mockery::mock(Agent::class);
         $tool = Mockery::mock(Tool::class);
         $tool->shouldReceive('name')->andReturn('search_web');
+        $tool->shouldReceive('description')->andReturn('Search the web for information');
 
         $event = new InvokingTool(
             invocationId: 'inv-1',
@@ -127,7 +128,7 @@ describe('GenAiAttributes::fromStart', function () {
         expect($attrs['gen_ai.operation.name'])->toBe('execute_tool');
         expect($attrs['gen_ai.tool.name'])->toBe('search_web');
         expect($attrs['gen_ai.tool.call.id'])->toBe('tool-call-abc');
-        expect($attrs['gen_ai.tool.arguments'])->toBe(json_encode(['query' => 'laravel testing']));
+        expect($attrs['gen_ai.tool.call.arguments'])->toBe(json_encode(['query' => 'laravel testing']));
     });
 
     test('unrecognised event returns empty array', function () {
@@ -213,7 +214,7 @@ describe('GenAiAttributes::fromEnd', function () {
 
         $attrs = GenAiAttributes::fromEnd($event);
 
-        expect($attrs['gen_ai.tool.result'])->toBe('the answer is 42');
+        expect($attrs['gen_ai.tool.call.result'])->toBe('the answer is 42');
     });
 
     test('ToolInvoked with array result returns json-encoded string as tool.result', function () {
@@ -231,7 +232,7 @@ describe('GenAiAttributes::fromEnd', function () {
 
         $attrs = GenAiAttributes::fromEnd($event);
 
-        expect($attrs['gen_ai.tool.result'])->toBe(json_encode(['status' => 'ok', 'count' => 3]));
+        expect($attrs['gen_ai.tool.call.result'])->toBe(json_encode(['status' => 'ok', 'count' => 3]));
     });
 
     test('unrecognised event returns empty array', function () {

@@ -77,6 +77,7 @@ class GenAiAttributes
         return array_filter([
             'gen_ai.operation.name' => 'chat',
             'gen_ai.request.model' => $event->prompt->model,
+            'gen_ai.provider.name' => $event->prompt->provider->name(),
             'gen_ai.system' => $event->prompt->provider->name(),
         ], fn ($v) => $v !== null);
     }
@@ -89,6 +90,9 @@ class GenAiAttributes
             'gen_ai.usage.output_tokens' => $event->response->usage->completionTokens,
         ];
 
+        if ($event->response->usage->reasoningTokens > 0) {
+            $attrs['gen_ai.usage.reasoning_tokens'] = $event->response->usage->reasoningTokens;
+        }
         if ($event->response->usage->cacheReadInputTokens > 0) {
             $attrs['gen_ai.usage.cache_read_input_tokens'] = $event->response->usage->cacheReadInputTokens;
         }
@@ -118,13 +122,17 @@ class GenAiAttributes
         $step = $event->response;
 
         $attrs = [
-            'gen_ai.response.model' => $step->meta->model,
+            'gen_ai.provider.name' => $step->meta->provider,
             'gen_ai.system' => $step->meta->provider,
+            'gen_ai.response.model' => $step->meta->model,
             'gen_ai.response.finish_reasons' => [$step->finishReason->value],
             'gen_ai.usage.input_tokens' => $step->usage->promptTokens,
             'gen_ai.usage.output_tokens' => $step->usage->completionTokens,
         ];
 
+        if ($step->usage->reasoningTokens > 0) {
+            $attrs['gen_ai.usage.reasoning_tokens'] = $step->usage->reasoningTokens;
+        }
         if ($step->usage->cacheReadInputTokens > 0) {
             $attrs['gen_ai.usage.cache_read_input_tokens'] = $step->usage->cacheReadInputTokens;
         }
@@ -142,15 +150,16 @@ class GenAiAttributes
         return array_filter([
             'gen_ai.operation.name' => 'execute_tool',
             'gen_ai.tool.name' => ToolNameResolver::resolve($event->tool),
+            'gen_ai.tool.description' => (string) $event->tool->description(),
             'gen_ai.tool.call.id' => $event->toolInvocationId,
-            'gen_ai.tool.arguments' => json_encode($event->arguments),
-        ], fn ($v) => $v !== null);
+            'gen_ai.tool.call.arguments' => json_encode($event->arguments),
+        ], fn ($v) => $v !== null && $v !== '');
     }
 
     private static function toolEnd(ToolInvoked $event): array
     {
         return array_filter([
-            'gen_ai.tool.result' => is_string($event->result)
+            'gen_ai.tool.call.result' => is_string($event->result)
                 ? $event->result
                 : json_encode($event->result),
         ], fn ($v) => $v !== null);
@@ -163,6 +172,7 @@ class GenAiAttributes
         return array_filter([
             'gen_ai.operation.name' => 'embeddings',
             'gen_ai.request.model' => $event->model,
+            'gen_ai.provider.name' => $event->provider->name(),
             'gen_ai.system' => $event->provider->name(),
         ], fn ($v) => $v !== null);
     }
@@ -182,6 +192,7 @@ class GenAiAttributes
         return array_filter([
             'gen_ai.operation.name' => 'image_generation',
             'gen_ai.request.model' => $event->model,
+            'gen_ai.provider.name' => $event->provider->name(),
             'gen_ai.system' => $event->provider->name(),
         ], fn ($v) => $v !== null);
     }
@@ -200,6 +211,7 @@ class GenAiAttributes
         return array_filter([
             'gen_ai.operation.name' => 'text_to_speech',
             'gen_ai.request.model' => $event->model,
+            'gen_ai.provider.name' => $event->provider->name(),
             'gen_ai.system' => $event->provider->name(),
         ], fn ($v) => $v !== null);
     }
@@ -218,6 +230,7 @@ class GenAiAttributes
         return array_filter([
             'gen_ai.operation.name' => 'transcription',
             'gen_ai.request.model' => $event->model,
+            'gen_ai.provider.name' => $event->provider->name(),
             'gen_ai.system' => $event->provider->name(),
         ], fn ($v) => $v !== null);
     }
@@ -236,6 +249,7 @@ class GenAiAttributes
         return array_filter([
             'gen_ai.operation.name' => 'reranking',
             'gen_ai.request.model' => $event->model,
+            'gen_ai.provider.name' => $event->provider->name(),
             'gen_ai.system' => $event->provider->name(),
         ], fn ($v) => $v !== null);
     }
