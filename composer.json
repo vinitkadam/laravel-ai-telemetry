@@ -14,14 +14,25 @@
         "issues": "https://github.com/vinitkadam/laravel-ai-telemetry/issues",
         "source": "https://github.com/vinitkadam/laravel-ai-telemetry"
     },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../laravel-ai",
+            "options": {
+                "symlink": true
+            }
+        }
+    ],
     "require": {
         "php": "^8.3",
         "illuminate/contracts": "^12.0|^13.0",
         "illuminate/support": "^12.0|^13.0",
-        "laravel/ai": "^0.8.1",
+        "laravel/ai": "*",
         "open-telemetry/api": "^1.0"
     },
     "require-dev": {
+        "mockery/mockery": "^1.6",
+        "open-telemetry/sdk": "^1.0",
         "orchestra/testbench": "^10.6|^11.0",
         "pestphp/pest": "^3.0|^4.0",
         "pestphp/pest-plugin-laravel": "^3.0|^4.0"

@@ -1,3 +1,3 @@
 <?php
 
-pest()->extend(Tests\TestCase::class)->in('Unit');
+pest()->extend(Tests\TestCase::class)->in('Unit', 'Feature');
