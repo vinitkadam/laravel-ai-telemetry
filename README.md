@@ -256,10 +256,10 @@ Context::add('ai.user_id', auth()->id());
 Context::add('ai.session_id', session()->getId());
 ```
 
-Agents implementing `HasTelemetryContext` can return additional attributes directly:
+Agents implementing `HasMetadata` can return additional attributes directly:
 
 ```php
-public function telemetryContext(): array
+public function metadata(): array
 {
     return ['ai.feature' => 'support-chat'];
 }

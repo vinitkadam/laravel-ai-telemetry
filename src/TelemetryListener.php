@@ -3,7 +3,7 @@
 namespace Vinit\LaravelAiTelemetry;
 
 use Illuminate\Support\Facades\Context;
-use Laravel\Ai\Contracts\HasTelemetryContext;
+use Laravel\Ai\Contracts\HasMetadata;
 use Laravel\Ai\Events\AgentFailed;
 use Laravel\Ai\Events\AgentPrompted;
 use Laravel\Ai\Events\AgentStreamed;
@@ -199,8 +199,8 @@ class TelemetryListener
 
     private function resolveTelemetryContext(PromptingAgent $event): array
     {
-        $agentContext = $event->prompt->agent instanceof HasTelemetryContext
-            ? $event->prompt->agent->telemetryContext()
+        $agentContext = $event->prompt->agent instanceof HasMetadata
+            ? $event->prompt->agent->metadata()
             : [];
 
         return array_merge($this->resolveContextMetadata(), $agentContext);
