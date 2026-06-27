@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Collection;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Contracts\Providers\TextProvider;
@@ -12,9 +13,15 @@ use Laravel\Ai\Events\StepStarted;
 use Laravel\Ai\Events\ToolInvoked;
 use Laravel\Ai\Gateway\StepResponse;
 use Laravel\Ai\Gateway\TextGenerationOptions;
+use Laravel\Ai\Messages\AssistantMessage;
+use Laravel\Ai\Messages\Message;
+use Laravel\Ai\Messages\MessageRole;
+use Laravel\Ai\Messages\ToolResultMessage;
 use Laravel\Ai\Prompts\AgentPrompt;
 use Laravel\Ai\Responses\Data\FinishReason;
 use Laravel\Ai\Responses\Data\Meta;
+use Laravel\Ai\Responses\Data\ToolCall;
+use Laravel\Ai\Responses\Data\ToolResult;
 use Laravel\Ai\Responses\Data\Usage;
 use Mockery\MockInterface;
 use Vinit\LaravelAiTelemetry\GenAiAttributes;
@@ -237,5 +244,184 @@ describe('GenAiAttributes::fromEnd', function () {
 
     test('unrecognised event returns empty array', function () {
         expect(GenAiAttributes::fromEnd(new stdClass))->toBe([]);
+    });
+});
+
+describe('gen_ai.input.messages serialization', function () {
+    test('user message is serialized with role and content', function () {
+        $event = new StepStarted(
+            invocationId: 'inv-1',
+            stepId: 'step-1',
+            stepNumber: 0,
+            model: 'gpt-4o',
+            messages: [new Message(MessageRole::User, 'What is the weather?')],
+        );
+
+        $attrs = GenAiAttributes::fromStart($event);
+
+        expect($attrs)->toHaveKey('gen_ai.input.messages');
+        $decoded = json_decode($attrs['gen_ai.input.messages'], true);
+        expect($decoded)->toHaveCount(1)
+            ->and($decoded[0]['role'])->toBe('user')
+            ->and($decoded[0]['content'])->toBe('What is the weather?');
+    });
+
+    test('assistant message without tool calls is serialized with content only', function () {
+        $event = new StepStarted(
+            invocationId: 'inv-1',
+            stepId: 'step-1',
+            stepNumber: 1,
+            model: 'gpt-4o',
+            messages: [new AssistantMessage('The weather is sunny.')],
+        );
+
+        $attrs = GenAiAttributes::fromStart($event);
+
+        $decoded = json_decode($attrs['gen_ai.input.messages'], true);
+        expect($decoded[0]['role'])->toBe('assistant')
+            ->and($decoded[0]['content'])->toBe('The weather is sunny.')
+            ->and($decoded[0])->not->toHaveKey('tool_calls');
+    });
+
+    test('assistant message with tool calls includes tool_calls array', function () {
+        $toolCall = new ToolCall('tc-1', 'get_weather', ['location' => 'Paris']);
+        $event = new StepStarted(
+            invocationId: 'inv-1',
+            stepId: 'step-1',
+            stepNumber: 1,
+            model: 'gpt-4o',
+            messages: [new AssistantMessage('', new Collection([$toolCall]))],
+        );
+
+        $attrs = GenAiAttributes::fromStart($event);
+
+        $decoded = json_decode($attrs['gen_ai.input.messages'], true);
+        expect($decoded[0]['role'])->toBe('assistant')
+            ->and($decoded[0]['tool_calls'])->toHaveCount(1)
+            ->and($decoded[0]['tool_calls'][0]['id'])->toBe('tc-1')
+            ->and($decoded[0]['tool_calls'][0]['name'])->toBe('get_weather')
+            ->and($decoded[0]['tool_calls'][0]['arguments'])->toBe(['location' => 'Paris']);
+    });
+
+    test('tool result message is serialized with role tool and tool_results', function () {
+        $toolResult = new ToolResult('tc-1', 'get_weather', [], 'sunny and 22°C', 'tr-1');
+        $event = new StepStarted(
+            invocationId: 'inv-1',
+            stepId: 'step-1',
+            stepNumber: 1,
+            model: 'gpt-4o',
+            messages: [new ToolResultMessage(new Collection([$toolResult]))],
+        );
+
+        $attrs = GenAiAttributes::fromStart($event);
+
+        $decoded = json_decode($attrs['gen_ai.input.messages'], true);
+        expect($decoded[0]['role'])->toBe('tool')
+            ->and($decoded[0]['tool_results'][0]['id'])->toBe('tc-1')
+            ->and($decoded[0]['tool_results'][0]['name'])->toBe('get_weather')
+            ->and($decoded[0]['tool_results'][0]['result'])->toBe('sunny and 22°C');
+    });
+
+    test('array tool result is json-encoded inside tool_results', function () {
+        $toolResult = new ToolResult('tc-2', 'search', [], ['hits' => 3, 'results' => ['a', 'b']], null);
+        $event = new StepStarted(
+            invocationId: 'inv-1',
+            stepId: 'step-1',
+            stepNumber: 1,
+            model: 'gpt-4o',
+            messages: [new ToolResultMessage(new Collection([$toolResult]))],
+        );
+
+        $attrs = GenAiAttributes::fromStart($event);
+
+        $decoded = json_decode($attrs['gen_ai.input.messages'], true);
+        expect($decoded[0]['tool_results'][0]['result'])->toBe(json_encode(['hits' => 3, 'results' => ['a', 'b']]));
+    });
+
+    test('empty messages omits gen_ai.input.messages', function () {
+        $event = new StepStarted('inv-1', 'step-1', 0, 'gpt-4o');
+
+        $attrs = GenAiAttributes::fromStart($event);
+
+        expect($attrs)->not->toHaveKey('gen_ai.input.messages');
+    });
+});
+
+describe('gen_ai.tool.definitions serialization', function () {
+    test('tools are serialized with name and description', function () {
+        $tool = Mockery::mock(Tool::class);
+        $tool->shouldReceive('name')->andReturn('get_weather');
+        $tool->shouldReceive('description')->andReturn('Get weather for a location');
+
+        $event = new StepStarted('inv-1', 'step-1', 0, 'gpt-4o', [], [$tool]);
+
+        $attrs = GenAiAttributes::fromStart($event);
+
+        expect($attrs)->toHaveKey('gen_ai.tool.definitions');
+        $decoded = json_decode($attrs['gen_ai.tool.definitions'], true);
+        expect($decoded)->toHaveCount(1)
+            ->and($decoded[0]['name'])->toBe('get_weather')
+            ->and($decoded[0]['description'])->toBe('Get weather for a location');
+    });
+
+    test('empty tools omits gen_ai.tool.definitions', function () {
+        $event = new StepStarted('inv-1', 'step-1', 0, 'gpt-4o');
+
+        $attrs = GenAiAttributes::fromStart($event);
+
+        expect($attrs)->not->toHaveKey('gen_ai.tool.definitions');
+    });
+});
+
+describe('gen_ai.output.messages serialization', function () {
+    test('StepFinished with text response emits output message with content', function () {
+        $response = fakeStepResponse();
+        $event = new StepFinished('inv-1', 'step-1', 0, $response);
+
+        $attrs = GenAiAttributes::fromEnd($event);
+
+        expect($attrs)->toHaveKey('gen_ai.output.messages');
+        $decoded = json_decode($attrs['gen_ai.output.messages'], true);
+        expect($decoded)->toHaveCount(1)
+            ->and($decoded[0]['role'])->toBe('assistant')
+            ->and($decoded[0]['content'])->toBe('response text');
+    });
+
+    test('StepFinished with tool calls emits output message with tool_calls', function () {
+        $step = new StepResponse(
+            text: '',
+            toolCalls: [new ToolCall('tc-1', 'get_weather', ['city' => 'Paris'])],
+            finishReason: FinishReason::ToolCalls,
+            usage: new Usage(100, 20),
+            meta: new Meta('openai', 'gpt-4o'),
+        );
+        $event = new StepFinished('inv-1', 'step-1', 0, $step);
+
+        $attrs = GenAiAttributes::fromEnd($event);
+
+        $decoded = json_decode($attrs['gen_ai.output.messages'], true);
+        expect($decoded[0]['role'])->toBe('assistant')
+            ->and($decoded[0])->not->toHaveKey('content')
+            ->and($decoded[0]['tool_calls'])->toHaveCount(1)
+            ->and($decoded[0]['tool_calls'][0]['id'])->toBe('tc-1')
+            ->and($decoded[0]['tool_calls'][0]['name'])->toBe('get_weather')
+            ->and($decoded[0]['tool_calls'][0]['arguments'])->toBe(['city' => 'Paris']);
+    });
+
+    test('StepFinished always emits gen_ai.output.messages even when text and tool calls are empty', function () {
+        $step = new StepResponse(
+            text: '',
+            toolCalls: [],
+            finishReason: FinishReason::Stop,
+            usage: new Usage,
+            meta: new Meta('openai', 'gpt-4o'),
+        );
+        $event = new StepFinished('inv-1', 'step-1', 0, $step);
+
+        $attrs = GenAiAttributes::fromEnd($event);
+
+        expect($attrs)->toHaveKey('gen_ai.output.messages');
+        $decoded = json_decode($attrs['gen_ai.output.messages'], true);
+        expect($decoded[0]['role'])->toBe('assistant');
     });
 });
