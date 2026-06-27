@@ -42,17 +42,17 @@ describe('SpanCollector', function () {
         expect($driver->opened[0]['parentKey'])->toBe('parent-span');
     });
 
-    test('startSpan merges telemetryContext into attributes with gen_ai.metadata. prefix stripping leading ai.', function () {
+    test('startSpan merges telemetryContext attributes directly into span attributes', function () {
         [$driver, $collector] = recordingDriver();
 
         $event = new stdClass;
-        $collector->startSpan('span-2', SpanOperation::Step, null, $event, [
-            'ai.user_id' => 'user-42',
-            'ai.session_id' => 'sess-99',
+        $collector->startSpan('span-2', SpanOperation::Agent, null, $event, [
+            'user.id' => 'u-123',
+            'meta.session_id' => 'sess-99',
         ]);
 
-        expect($driver->opened[0]['attrs'])->toHaveKey('gen_ai.metadata.user_id', 'user-42');
-        expect($driver->opened[0]['attrs'])->toHaveKey('gen_ai.metadata.session_id', 'sess-99');
+        expect($driver->opened[0]['attrs'])->toHaveKey('user.id', 'u-123');
+        expect($driver->opened[0]['attrs'])->toHaveKey('meta.session_id', 'sess-99');
     });
 
     test('endSpan calls closeSpan on the driver with null exception', function () {

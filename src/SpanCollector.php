@@ -21,7 +21,7 @@ class SpanCollector
     ): void {
         $attributes = array_merge(
             GenAiAttributes::fromStart($startEvent),
-            $this->flattenTelemetryContext($telemetryContext),
+            $telemetryContext,
         );
 
         $this->driver->openSpan($key, $operation, $parentKey, $this->nanoTime(), $attributes);
@@ -65,14 +65,5 @@ class SpanCollector
         return (int) (microtime(true) * 1_000_000_000);
     }
 
-    private function flattenTelemetryContext(array $context): array
-    {
-        $flat = [];
 
-        foreach ($context as $key => $value) {
-            $flat['gen_ai.metadata.'.ltrim($key, 'ai.')] = $value;
-        }
-
-        return $flat;
-    }
 }
