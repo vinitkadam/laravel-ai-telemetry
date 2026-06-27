@@ -2,15 +2,27 @@
 
 use Illuminate\Support\Collection;
 use Laravel\Ai\Contracts\Agent;
-use Laravel\Ai\Contracts\Tool;
+use Laravel\Ai\Contracts\Files\TranscribableAudio;
+use Laravel\Ai\Contracts\Providers\EmbeddingProvider;
 use Laravel\Ai\Contracts\Providers\TextProvider;
+use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Events\AgentFailed;
+use Laravel\Ai\Events\AudioGenerated;
+use Laravel\Ai\Events\EmbeddingsGenerated;
+use Laravel\Ai\Events\GeneratingAudio;
+use Laravel\Ai\Events\GeneratingEmbeddings;
+use Laravel\Ai\Events\GeneratingImage;
+use Laravel\Ai\Events\GeneratingTranscription;
+use Laravel\Ai\Events\ImageGenerated;
 use Laravel\Ai\Events\InvokingTool;
 use Laravel\Ai\Events\PromptingAgent;
+use Laravel\Ai\Events\Reranked;
+use Laravel\Ai\Events\Reranking;
 use Laravel\Ai\Events\StepFinished;
 use Laravel\Ai\Events\StepFailed;
 use Laravel\Ai\Events\StepStarted;
 use Laravel\Ai\Events\ToolInvoked;
+use Laravel\Ai\Events\TranscriptionGenerated;
 use Laravel\Ai\Gateway\StepResponse;
 use Laravel\Ai\Gateway\TextGenerationOptions;
 use Laravel\Ai\Messages\AssistantMessage;
@@ -18,11 +30,22 @@ use Laravel\Ai\Messages\Message;
 use Laravel\Ai\Messages\MessageRole;
 use Laravel\Ai\Messages\ToolResultMessage;
 use Laravel\Ai\Prompts\AgentPrompt;
+use Laravel\Ai\Prompts\AudioPrompt;
+use Laravel\Ai\Prompts\EmbeddingsPrompt;
+use Laravel\Ai\Prompts\ImagePrompt;
+use Laravel\Ai\Prompts\RerankingPrompt;
+use Laravel\Ai\Prompts\TranscriptionPrompt;
+use Laravel\Ai\Providers\Provider;
+use Laravel\Ai\Responses\AudioResponse;
 use Laravel\Ai\Responses\Data\FinishReason;
 use Laravel\Ai\Responses\Data\Meta;
 use Laravel\Ai\Responses\Data\ToolCall;
 use Laravel\Ai\Responses\Data\ToolResult;
 use Laravel\Ai\Responses\Data\Usage;
+use Laravel\Ai\Responses\EmbeddingsResponse;
+use Laravel\Ai\Responses\ImageResponse;
+use Laravel\Ai\Responses\RerankingResponse;
+use Laravel\Ai\Responses\TranscriptionResponse;
 use Mockery\MockInterface;
 use Vinit\LaravelAiTelemetry\GenAiAttributes;
 
@@ -423,5 +446,219 @@ describe('gen_ai.output.messages serialization', function () {
         expect($attrs)->toHaveKey('gen_ai.output.messages');
         $decoded = json_decode($attrs['gen_ai.output.messages'], true);
         expect($decoded[0]['role'])->toBe('assistant');
+    });
+});
+
+// ── Helpers for non-chat operation tests ──────────────────────────────────────
+
+function fakeProvider(string $name = 'openai'): Provider
+{
+    $provider = Mockery::mock(Provider::class);
+    $provider->shouldReceive('name')->andReturn($name);
+
+    return $provider;
+}
+
+// ── Embeddings ────────────────────────────────────────────────────────────────
+
+describe('Embeddings attributes', function () {
+    test('GeneratingEmbeddings emits operation, model, provider, and dimensions', function () {
+        $provider = fakeProvider('openai');
+        $embeddingProvider = Mockery::mock(EmbeddingProvider::class);
+        $prompt = new EmbeddingsPrompt(
+            inputs: ['hello world'],
+            dimensions: 1536,
+            provider: $embeddingProvider,
+            model: 'text-embedding-3-small',
+        );
+        $event = new GeneratingEmbeddings('inv-1', $provider, 'text-embedding-3-small', $prompt);
+
+        $attrs = GenAiAttributes::fromStart($event);
+
+        expect($attrs['gen_ai.operation.name'])->toBe('embeddings')
+            ->and($attrs['gen_ai.request.model'])->toBe('text-embedding-3-small')
+            ->and($attrs['gen_ai.system'])->toBe('openai')
+            ->and($attrs['gen_ai.request.embedding.dimensions'])->toBe(1536);
+    });
+
+    test('GeneratingEmbeddings omits dimensions when zero', function () {
+        $provider = fakeProvider();
+        $embeddingProvider = Mockery::mock(EmbeddingProvider::class);
+        $prompt = new EmbeddingsPrompt(['hello'], 0, $embeddingProvider, 'text-embedding-ada-002');
+        $event = new GeneratingEmbeddings('inv-1', $provider, 'text-embedding-ada-002', $prompt);
+
+        $attrs = GenAiAttributes::fromStart($event);
+
+        expect($attrs)->not->toHaveKey('gen_ai.request.embedding.dimensions');
+    });
+
+    test('EmbeddingsGenerated emits input_tokens and response model', function () {
+        $provider = fakeProvider();
+        $embeddingProvider = Mockery::mock(EmbeddingProvider::class);
+        $prompt = new EmbeddingsPrompt(['hello'], 1536, $embeddingProvider, 'text-embedding-3-small');
+        $response = new EmbeddingsResponse([[0.1, 0.2, 0.3]], 42, new Meta('openai', 'text-embedding-3-small'));
+        $event = new EmbeddingsGenerated('inv-1', $provider, 'text-embedding-3-small', $prompt, $response);
+
+        $attrs = GenAiAttributes::fromEnd($event);
+
+        expect($attrs['gen_ai.usage.input_tokens'])->toBe(42)
+            ->and($attrs['gen_ai.response.model'])->toBe('text-embedding-3-small');
+    });
+});
+
+// ── Image ─────────────────────────────────────────────────────────────────────
+
+describe('Image attributes', function () {
+    test('GeneratingImage emits operation, model, and provider', function () {
+        $provider = fakeProvider('openai');
+        $imageProvider = Mockery::mock(\Laravel\Ai\Contracts\Providers\ImageProvider::class);
+        $prompt = new ImagePrompt('a cat', [], '1024x1024', 'hd', $imageProvider, 'dall-e-3');
+        $event = new GeneratingImage('inv-1', $provider, 'dall-e-3', $prompt);
+
+        $attrs = GenAiAttributes::fromStart($event);
+
+        expect($attrs['gen_ai.operation.name'])->toBe('image_generation')
+            ->and($attrs['gen_ai.request.model'])->toBe('dall-e-3')
+            ->and($attrs['gen_ai.system'])->toBe('openai');
+    });
+
+    test('ImageGenerated emits response model and usage tokens', function () {
+        $provider = fakeProvider();
+        $imageProvider = Mockery::mock(\Laravel\Ai\Contracts\Providers\ImageProvider::class);
+        $prompt = new ImagePrompt('a cat', [], null, null, $imageProvider, 'dall-e-3');
+        $response = new ImageResponse(
+            new Collection,
+            new Usage(promptTokens: 50, completionTokens: 0),
+            new Meta('openai', 'dall-e-3'),
+        );
+        $event = new ImageGenerated('inv-1', $provider, 'dall-e-3', $prompt, $response);
+
+        $attrs = GenAiAttributes::fromEnd($event);
+
+        expect($attrs['gen_ai.response.model'])->toBe('dall-e-3')
+            ->and($attrs['gen_ai.usage.input_tokens'])->toBe(50);
+    });
+
+    test('ImageGenerated omits usage tokens when zero', function () {
+        $provider = fakeProvider();
+        $imageProvider = Mockery::mock(\Laravel\Ai\Contracts\Providers\ImageProvider::class);
+        $prompt = new ImagePrompt('a cat', [], null, null, $imageProvider, 'dall-e-3');
+        $response = new ImageResponse(new Collection, new Usage, new Meta('openai', 'dall-e-3'));
+        $event = new ImageGenerated('inv-1', $provider, 'dall-e-3', $prompt, $response);
+
+        $attrs = GenAiAttributes::fromEnd($event);
+
+        expect($attrs)->not->toHaveKey('gen_ai.usage.input_tokens')
+            ->and($attrs)->not->toHaveKey('gen_ai.usage.output_tokens');
+    });
+});
+
+// ── Audio ─────────────────────────────────────────────────────────────────────
+
+describe('Audio attributes', function () {
+    test('GeneratingAudio emits operation, model, and provider', function () {
+        $provider = fakeProvider('openai');
+        $audioProvider = Mockery::mock(\Laravel\Ai\Contracts\Providers\AudioProvider::class);
+        $prompt = new AudioPrompt('Hello world', 'alloy', null, $audioProvider, 'tts-1');
+        $event = new GeneratingAudio('inv-1', $provider, 'tts-1', $prompt);
+
+        $attrs = GenAiAttributes::fromStart($event);
+
+        expect($attrs['gen_ai.operation.name'])->toBe('text_to_speech')
+            ->and($attrs['gen_ai.request.model'])->toBe('tts-1')
+            ->and($attrs['gen_ai.system'])->toBe('openai');
+    });
+
+    test('AudioGenerated emits response model', function () {
+        $provider = fakeProvider();
+        $audioProvider = Mockery::mock(\Laravel\Ai\Contracts\Providers\AudioProvider::class);
+        $prompt = new AudioPrompt('Hello world', 'alloy', null, $audioProvider, 'tts-1');
+        $response = new AudioResponse(base64_encode('fake-audio'), new Meta('openai', 'tts-1'));
+        $event = new AudioGenerated('inv-1', $provider, 'tts-1', $prompt, $response);
+
+        $attrs = GenAiAttributes::fromEnd($event);
+
+        expect($attrs['gen_ai.response.model'])->toBe('tts-1');
+    });
+});
+
+// ── Transcription ─────────────────────────────────────────────────────────────
+
+describe('Transcription attributes', function () {
+    test('GeneratingTranscription emits operation, model, and provider', function () {
+        $provider = fakeProvider('openai');
+        $transcriptionProvider = Mockery::mock(\Laravel\Ai\Contracts\Providers\TranscriptionProvider::class);
+        $audio = Mockery::mock(TranscribableAudio::class);
+        $prompt = new TranscriptionPrompt($audio, 'en', false, $transcriptionProvider, 'whisper-1');
+        $event = new GeneratingTranscription('inv-1', $provider, 'whisper-1', $prompt);
+
+        $attrs = GenAiAttributes::fromStart($event);
+
+        expect($attrs['gen_ai.operation.name'])->toBe('transcription')
+            ->and($attrs['gen_ai.request.model'])->toBe('whisper-1')
+            ->and($attrs['gen_ai.system'])->toBe('openai');
+    });
+
+    test('TranscriptionGenerated emits response model and usage tokens', function () {
+        $provider = fakeProvider();
+        $transcriptionProvider = Mockery::mock(\Laravel\Ai\Contracts\Providers\TranscriptionProvider::class);
+        $audio = Mockery::mock(TranscribableAudio::class);
+        $prompt = new TranscriptionPrompt($audio, null, false, $transcriptionProvider, 'whisper-1');
+        $response = new TranscriptionResponse(
+            'Hello world',
+            new Collection,
+            new Usage(promptTokens: 200, completionTokens: 30),
+            new Meta('openai', 'whisper-1'),
+        );
+        $event = new TranscriptionGenerated('inv-1', $provider, 'whisper-1', $prompt, $response);
+
+        $attrs = GenAiAttributes::fromEnd($event);
+
+        expect($attrs['gen_ai.response.model'])->toBe('whisper-1')
+            ->and($attrs['gen_ai.usage.input_tokens'])->toBe(200)
+            ->and($attrs['gen_ai.usage.output_tokens'])->toBe(30);
+    });
+
+    test('TranscriptionGenerated omits usage tokens when zero', function () {
+        $provider = fakeProvider();
+        $transcriptionProvider = Mockery::mock(\Laravel\Ai\Contracts\Providers\TranscriptionProvider::class);
+        $audio = Mockery::mock(TranscribableAudio::class);
+        $prompt = new TranscriptionPrompt($audio, null, false, $transcriptionProvider, 'whisper-1');
+        $response = new TranscriptionResponse('Hello', new Collection, new Usage, new Meta('openai', 'whisper-1'));
+        $event = new TranscriptionGenerated('inv-1', $provider, 'whisper-1', $prompt, $response);
+
+        $attrs = GenAiAttributes::fromEnd($event);
+
+        expect($attrs)->not->toHaveKey('gen_ai.usage.input_tokens')
+            ->and($attrs)->not->toHaveKey('gen_ai.usage.output_tokens');
+    });
+});
+
+// ── Reranking ─────────────────────────────────────────────────────────────────
+
+describe('Reranking attributes', function () {
+    test('Reranking emits operation, model, and provider', function () {
+        $provider = fakeProvider('cohere');
+        $rerankingProvider = Mockery::mock(\Laravel\Ai\Contracts\Providers\RerankingProvider::class);
+        $prompt = new RerankingPrompt(['doc 1', 'doc 2'], 'find cats', 1, $rerankingProvider, 'rerank-english-v3.0');
+        $event = new Reranking('inv-1', $provider, 'rerank-english-v3.0', $prompt);
+
+        $attrs = GenAiAttributes::fromStart($event);
+
+        expect($attrs['gen_ai.operation.name'])->toBe('reranking')
+            ->and($attrs['gen_ai.request.model'])->toBe('rerank-english-v3.0')
+            ->and($attrs['gen_ai.system'])->toBe('cohere');
+    });
+
+    test('Reranked emits response model', function () {
+        $provider = fakeProvider('cohere');
+        $rerankingProvider = Mockery::mock(\Laravel\Ai\Contracts\Providers\RerankingProvider::class);
+        $prompt = new RerankingPrompt(['doc 1'], 'find cats', null, $rerankingProvider, 'rerank-english-v3.0');
+        $response = new RerankingResponse([], new Meta('cohere', 'rerank-english-v3.0'));
+        $event = new Reranked('inv-1', $provider, 'rerank-english-v3.0', $prompt, $response);
+
+        $attrs = GenAiAttributes::fromEnd($event);
+
+        expect($attrs['gen_ai.response.model'])->toBe('rerank-english-v3.0');
     });
 });

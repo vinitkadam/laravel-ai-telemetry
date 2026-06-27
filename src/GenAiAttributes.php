@@ -207,6 +207,7 @@ class GenAiAttributes
             'gen_ai.request.model' => $event->model,
             'gen_ai.provider.name' => $event->provider->name(),
             'gen_ai.system' => $event->provider->name(),
+            'gen_ai.request.embedding.dimensions' => $event->prompt->dimensions ?: null,
         ], fn ($v) => $v !== null);
     }
 
@@ -234,6 +235,8 @@ class GenAiAttributes
     {
         return array_filter([
             'gen_ai.response.model' => $event->response->meta->model,
+            'gen_ai.usage.input_tokens' => $event->response->usage->promptTokens ?: null,
+            'gen_ai.usage.output_tokens' => $event->response->usage->completionTokens ?: null,
         ], fn ($v) => $v !== null);
     }
 
@@ -272,6 +275,8 @@ class GenAiAttributes
     {
         return array_filter([
             'gen_ai.response.model' => $event->response->meta->model,
+            'gen_ai.usage.input_tokens' => $event->response->usage->promptTokens ?: null,
+            'gen_ai.usage.output_tokens' => $event->response->usage->completionTokens ?: null,
         ], fn ($v) => $v !== null);
     }
 
