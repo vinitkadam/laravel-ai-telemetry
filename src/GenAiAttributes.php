@@ -2,6 +2,7 @@
 
 namespace Vinit\LaravelAiTelemetry;
 
+use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Events\AgentFailed;
 use Laravel\Ai\Events\AgentPrompted;
 use Laravel\Ai\Events\AgentStreamed;
@@ -22,6 +23,8 @@ use Laravel\Ai\Events\StepStarted;
 use Laravel\Ai\Events\StreamingAgent;
 use Laravel\Ai\Events\ToolInvoked;
 use Laravel\Ai\Events\TranscriptionGenerated;
+use Laravel\Ai\Messages\AssistantMessage;
+use Laravel\Ai\Messages\ToolResultMessage;
 use Laravel\Ai\Tools\ToolNameResolver;
 
 class GenAiAttributes
@@ -107,7 +110,7 @@ class GenAiAttributes
 
     private static function stepStart(StepStarted $event): array
     {
-        return array_filter([
+        $attrs = array_filter([
             'gen_ai.operation.name' => 'chat',
             'gen_ai.request.model' => $event->model,
             'gen_ai.request.step_number' => $event->stepNumber,
@@ -115,6 +118,20 @@ class GenAiAttributes
             'gen_ai.request.temperature' => $event->options?->temperature,
             'gen_ai.request.top_p' => $event->options?->topP,
         ], fn ($v) => $v !== null);
+
+        if (filled($event->messages)) {
+            $attrs['gen_ai.input.messages'] = json_encode(
+                array_map(fn ($m) => self::serializeMessage($m), $event->messages)
+            );
+        }
+
+        if (filled($event->tools)) {
+            $attrs['gen_ai.tool.definitions'] = json_encode(
+                array_map(fn (Tool $t) => self::serializeTool($t), $event->tools)
+            );
+        }
+
+        return $attrs;
     }
 
     private static function stepEnd(StepFinished $event): array
@@ -139,6 +156,22 @@ class GenAiAttributes
         if ($step->usage->cacheWriteInputTokens > 0) {
             $attrs['gen_ai.usage.cache_creation_input_tokens'] = $step->usage->cacheWriteInputTokens;
         }
+
+        $outputMessage = ['role' => 'assistant'];
+
+        if (filled($step->text)) {
+            $outputMessage['content'] = $step->text;
+        }
+
+        if (filled($step->toolCalls)) {
+            $outputMessage['tool_calls'] = array_map(fn ($tc) => [
+                'id' => $tc->id,
+                'name' => $tc->name,
+                'arguments' => $tc->arguments,
+            ], $step->toolCalls);
+        }
+
+        $attrs['gen_ai.output.messages'] = json_encode([$outputMessage]);
 
         return array_filter($attrs, fn ($v) => $v !== null);
     }
@@ -259,5 +292,48 @@ class GenAiAttributes
         return array_filter([
             'gen_ai.response.model' => $event->response->meta->model,
         ], fn ($v) => $v !== null);
+    }
+
+    // ── Serializers ────────────────────────────────────────────────────────────
+
+    private static function serializeMessage(mixed $message): array
+    {
+        if ($message instanceof AssistantMessage) {
+            $msg = ['role' => 'assistant', 'content' => $message->content ?? ''];
+
+            if ($message->toolCalls->isNotEmpty()) {
+                $msg['tool_calls'] = $message->toolCalls->map(fn ($tc) => [
+                    'id' => $tc->id,
+                    'name' => $tc->name,
+                    'arguments' => $tc->arguments,
+                ])->values()->all();
+            }
+
+            return $msg;
+        }
+
+        if ($message instanceof ToolResultMessage) {
+            return [
+                'role' => 'tool',
+                'tool_results' => $message->toolResults->map(fn ($tr) => [
+                    'id' => $tr->id,
+                    'name' => $tr->name,
+                    'result' => is_string($tr->result) ? $tr->result : json_encode($tr->result),
+                ])->values()->all(),
+            ];
+        }
+
+        return [
+            'role' => $message->role->value,
+            'content' => $message->content ?? '',
+        ];
+    }
+
+    private static function serializeTool(Tool $tool): array
+    {
+        return array_filter([
+            'name' => ToolNameResolver::resolve($tool),
+            'description' => (string) $tool->description(),
+        ], fn ($v) => $v !== '');
     }
 }
